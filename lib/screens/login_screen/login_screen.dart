@@ -1,11 +1,15 @@
-// ignore_for_file: unused_element
+// ignore_for_file: unused_element, avoid_print
 
+import 'dart:convert';
+import 'package:getvalue/screens/Dashboard/dashboard_screen.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:getvalue/screens/register/register.dart';
 import 'package:getvalue/services/constants.dart';
 import 'package:getvalue/size_confige.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -20,12 +24,126 @@ class _LoginScreenState extends State<LoginScreen> {
   bool remembervalue = false;
   bool isLoading = false;
   String? username;
-
+  final _formKey = GlobalKey<FormState>();
   String? password;
   String auth = '';
   String? role;
 
   final List<String> errors = [];
+
+  Future<void> createUser(
+      String token,
+      int userId,
+      int stationId,
+      String checkpointId,
+      String fname,
+      String lname,
+      String email,
+      String phoneNumber,
+      String stationName,
+      String checkpointName) async {
+    await SharedPreferences.getInstance().then((prefs) {
+      prefs.setInt('user_id', userId);
+      prefs.setString('token', token);
+      prefs.setInt('station_id', stationId);
+      prefs.setString('StationName', stationName);
+      prefs.setString('fname', fname);
+      prefs.setString('lname', lname);
+      prefs.setString('email', email);
+      prefs.setString('phoneNumber', phoneNumber);
+      prefs.setString('checkpointId', checkpointId);
+      prefs.setString('checkpointName', checkpointName);
+    });
+  }
+
+  Future<String> loginAuth() async {
+    try {
+      var url = Uri.parse('$baseUrl/app/api/authenticate');
+
+      final response = await http.post(
+        url,
+        body: {
+          'username': username,
+          'password': password,
+        },
+      );
+      var res;
+      //final sharedP prefs=await
+      print(response.statusCode);
+      switch (response.statusCode) {
+        case 200:
+          setState(() {
+            res = json.decode(response.body);
+            print(res);
+          });
+
+          await createUser(
+            res['access_token'],
+            res['user']['user_id'],
+            res['user']['station_id'],
+            res['user']['checkpoint_id'].toString(),
+            res['user']['first_name'],
+            res['user']['last_name'],
+            res['user']['email'].toString(),
+            res['user']['phone'].toString(),
+            res['user']['station'].toString(),
+            res['user']['checkpoint_name'].toString(),
+          );
+          return 'success';
+          // ignore: dead_code
+          break;
+        case 403:
+          setState(() {
+            res = json.decode(response.body);
+            print(res);
+            if (res['message'] == 'Invalid Credentials') {
+              addError(error: 'Incorrect Password or Email');
+            } else if (res['message'] ==
+                'Your Device Is Locked Please Contact User Support Team') {
+              addError(
+                  error:
+                      'Your Device Is Locked Please Contact User Support Team');
+            }
+
+            isLoading = false;
+          });
+          return 'fail';
+          // ignore: dead_code
+          break;
+
+        case 1200:
+          setState(() {
+            res = json.decode(response.body);
+            print(res);
+            addError(
+                error:
+                    'Your Device Is Locked Please Contact User Support Team');
+          });
+          return 'fail';
+          // ignore: dead_code
+          break;
+
+        default:
+          setState(() {
+            res = json.decode(response.body);
+            print(res);
+            addError(error: 'Something Went Wrong');
+            isLoading = false;
+          });
+          return 'fail';
+          // ignore: dead_code
+          break;
+      }
+    } catch (e) {
+      setState(() {
+        print(e);
+
+        addError(error: 'Server Or Network Connectivity Error');
+        isLoading = false;
+      });
+      return 'fail';
+    }
+  }
 
   void addError({required String error}) {
     if (!errors.contains(error)) {
@@ -45,7 +163,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _submitButton() {
     return InkWell(
-      onTap: () async {},
+      onTap: () async {
+        if (_formKey.currentState!.validate()) {
+          _formKey.currentState!.save();
+          // print(username);
+          // print(password);
+
+          // await loginAuth();
+          Navigator.of(context).pushNamed(DashBoardScreen.routeName);
+        }
+      },
       child: isLoading
           ? SpinKitFadingCircle(
               color: kPrimaryColor,
@@ -78,74 +205,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-    );
-  }
-
-  Widget _emailPasswordWidget() {
-    return Column(
-      children: <Widget>[
-        _entryField("Username"),
-        _entryField("Password", isPassword: true),
-      ],
-    );
-  }
-
-  Widget _entryField(String title, {bool isPassword = false}) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 5),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 0, 0),
-              child: Text(
-                title,
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-            ),
-            const SizedBox(
-              height: 5,
-            ),
-            TextFormField(
-                onChanged: (value) {
-                  if (value.isNotEmpty) {
-                    errors.contains('Network Problem')
-                        ? removeError(
-                            error: 'Server Or Network Connectivity Error')
-                        : errors.contains('Incorrect Password or Email')
-                            ? removeError(error: 'Incorrect Password or Email')
-                            : removeError(
-                                error: 'Your Not Authourized To Use This App');
-                  }
-                  return;
-                },
-                validator: (value) =>
-                    value == '' ? 'This  Field Is Required' : null,
-                // isPassword
-                //     ? null
-                //     : emailValidatorRegExp.hasMatch(value!)
-                //         ? null
-                //         : 'Enter Valid Email',
-                onSaved: (value) {
-                  setState(() {
-                    isPassword ? password = value! : username = value!;
-                  });
-                },
-                keyboardType: TextInputType.emailAddress,
-                cursorColor: kPrimaryColor,
-                obscureText: isPassword,
-                decoration: const InputDecoration(
-                    isDense: true,
-                    contentPadding: EdgeInsets.fromLTRB(30, 20, 20, 10),
-                    border: InputBorder.none,
-                    fillColor: Color(0xfff3f3f4),
-                    filled: true))
-          ],
-        ),
-      ),
     );
   }
 
@@ -193,143 +252,192 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               AnimationLimiter(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: AnimationConfiguration.toStaggeredList(
-                    duration: const Duration(milliseconds: 675),
-                    childAnimationBuilder: (widget) => SlideAnimation(
-                      horizontalOffset: 50.0,
-                      child: FadeInAnimation(
-                        child: widget,
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: AnimationConfiguration.toStaggeredList(
+                      duration: const Duration(milliseconds: 675),
+                      childAnimationBuilder: (widget) => SlideAnimation(
+                        horizontalOffset: 50.0,
+                        child: FadeInAnimation(
+                          child: widget,
+                        ),
                       ),
+                      children: [
+                        SizedBox(
+                          height: getRelativeHeight(0.04),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(
+                              top: 10, right: 20, left: 20),
+                          child: SizedBox(
+                            child: TextFormField(
+                              keyboardType: TextInputType.text,
+                              key: const Key("email"),
+                              decoration: const InputDecoration(
+                                enabledBorder: UnderlineInputBorder(
+                                  borderSide: BorderSide(color: Colors.black38),
+                                ),
+                                focusedBorder: UnderlineInputBorder(
+                                  borderSide: BorderSide(color: Colors.black87),
+                                ),
+                                // fillColor: const Color(0xfff3f3f4),
+                                fillColor: Colors.white,
+                                filled: true,
+                                labelText: "Email Address",
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding:
+                                    EdgeInsets.fromLTRB(5, 10, 15, 2),
+                              ),
+                              validator: (value) {
+                                if (value!.isEmpty) {
+                                  return "This Field Is Required";
+                                }
+                                return null;
+                              },
+                              onSaved: (value) {
+                                setState(() {
+                                  username = value!;
+                                });
+                              },
+                              onChanged: (value) {
+                                if (value.isNotEmpty) {
+                                  errors.contains('Network Problem')
+                                      ? removeError(
+                                          error:
+                                              'Server Or Network Connectivity Error')
+                                      : errors.contains(
+                                              'Incorrect Password or Email')
+                                          ? removeError(
+                                              error:
+                                                  'Incorrect Password or Email')
+                                          : removeError(
+                                              error:
+                                                  'Your Not Authourized To Use This App');
+                                }
+                                return;
+                              },
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          height: getRelativeHeight(0.02),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(
+                              top: 10, right: 20, left: 20),
+                          child: SizedBox(
+                            child: TextFormField(
+                              obscureText: true,
+                              key: const Key("pwd"),
+                              decoration: const InputDecoration(
+                                enabledBorder: UnderlineInputBorder(
+                                  borderSide: BorderSide(color: Colors.black38),
+                                ),
+                                focusedBorder: UnderlineInputBorder(
+                                  borderSide: BorderSide(color: Colors.black87),
+                                ),
+                                // fillColor: Color(0xfff3f3f4),
+                                fillColor: Colors.white,
+                                filled: true,
+                                labelText: "Password",
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding:
+                                    EdgeInsets.fromLTRB(5, 10, 15, 2),
+                              ),
+                              validator: (value) {
+                                if (value!.isEmpty) {
+                                  return "This Field Is Required";
+                                }
+                                return null;
+                              },
+                              onSaved: (value) {
+                                setState(() {
+                                  password = value!;
+                                });
+                              },
+                              onChanged: (value) {
+                                if (value.isNotEmpty) {
+                                  errors.contains('Network Problem')
+                                      ? removeError(
+                                          error:
+                                              'Server Or Network Connectivity Error')
+                                      : errors.contains(
+                                              'Incorrect Password or Email')
+                                          ? removeError(
+                                              error:
+                                                  'Incorrect Password or Email')
+                                          : removeError(
+                                              error:
+                                                  'Your Not Authourized To Use This App');
+                                }
+                                return;
+                              },
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(
+                              top: 10, right: 17, left: 20),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: <Widget>[
+                              Expanded(
+                                flex: 1,
+                                child: Checkbox(
+                                  checkColor: Colors.white,
+                                  focusColor: Colors.black,
+                                  value: remembervalue,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      remembervalue = value!;
+                                    });
+                                  },
+                                ),
+                              ), //SizedBox
+                              const Expanded(
+                                flex: 5,
+                                child: Text(
+                                  'Remember Me',
+                                  style: TextStyle(color: Colors.black87),
+                                ),
+                              ), //Text
+                              const Spacer(),
+                              const Expanded(
+                                flex: 6,
+                                child: Text(
+                                  'Forgot Your Password?',
+                                  style: TextStyle(color: Colors.black87),
+                                ),
+                              ),
+                            ], //<Widget>[]
+                          ),
+                        ),
+                        _submitButton(),
+                        InkWell(
+                          onTap: () =>
+                              Navigator.pushNamed(context, Register.routeName),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: getRelativeWidth(0.1),
+                              ),
+                              const Text(
+                                'Don\'t have an account? ',
+                                style: TextStyle(color: Colors.black87),
+                              ),
+                              const Text(
+                                ' Sign Up ',
+                                style: TextStyle(color: kPrimaryColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    children: [
-                      SizedBox(
-                        height: getRelativeHeight(0.04),
-                      ),
-                      Padding(
-                        padding:
-                            const EdgeInsets.only(top: 10, right: 20, left: 20),
-                        child: SizedBox(
-                          child: TextFormField(
-                            keyboardType: TextInputType.text,
-                            key: const Key("email"),
-                            decoration: const InputDecoration(
-                              enabledBorder: UnderlineInputBorder(
-                                borderSide: BorderSide(color: Colors.black38),
-                              ),
-                              focusedBorder: UnderlineInputBorder(
-                                borderSide: BorderSide(color: Colors.black87),
-                              ),
-                              // fillColor: const Color(0xfff3f3f4),
-                              fillColor: Colors.white,
-                              filled: true,
-                              labelText: "Email Address",
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: EdgeInsets.fromLTRB(5, 10, 15, 2),
-                            ),
-                            validator: (value) {
-                              if (value!.isEmpty) {
-                                return "This Field Is Required";
-                              }
-                              return null;
-                            },
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        height: getRelativeHeight(0.02),
-                      ),
-                      Padding(
-                        padding:
-                            const EdgeInsets.only(top: 10, right: 20, left: 20),
-                        child: SizedBox(
-                          child: TextFormField(
-                            keyboardType: TextInputType.text,
-                            key: const Key("pwd"),
-                            decoration: const InputDecoration(
-                              enabledBorder: UnderlineInputBorder(
-                                borderSide: BorderSide(color: Colors.black38),
-                              ),
-                              focusedBorder: UnderlineInputBorder(
-                                borderSide: BorderSide(color: Colors.black87),
-                              ),
-                              // fillColor: Color(0xfff3f3f4),
-                              fillColor: Colors.white,
-                              filled: true,
-                              labelText: "Password",
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: EdgeInsets.fromLTRB(5, 10, 15, 2),
-                            ),
-                            validator: (value) {
-                              if (value!.isEmpty) {
-                                return "This Field Is Required";
-                              }
-                              return null;
-                            },
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding:
-                            const EdgeInsets.only(top: 10, right: 17, left: 20),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: <Widget>[
-                            Expanded(
-                              flex: 1,
-                              child: Checkbox(
-                                checkColor: Colors.white,
-                                focusColor: Colors.black,
-                                value: remembervalue,
-                                onChanged: (value) {
-                                  setState(() {
-                                    remembervalue = value!;
-                                  });
-                                },
-                              ),
-                            ), //SizedBox
-                            const Expanded(
-                              flex: 5,
-                              child: Text(
-                                'Remember Me',
-                                style: TextStyle(color: Colors.black87),
-                              ),
-                            ), //Text
-                            const Spacer(),
-                            const Expanded(
-                              flex: 6,
-                              child: Text(
-                                'Forgot Your Password?',
-                                style: TextStyle(color: Colors.black87),
-                              ),
-                            ),
-                          ], //<Widget>[]
-                        ),
-                      ),
-                      _submitButton(),
-                      InkWell(
-                        onTap: () =>
-                            Navigator.pushNamed(context, Register.routeName),
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: getRelativeWidth(0.1),
-                            ),
-                            const Text(
-                              'Don\'t have an account? ',
-                              style: TextStyle(color: Colors.black87),
-                            ),
-                            const Text(
-                              ' Sign Up ',
-                              style: TextStyle(color: kPrimaryColor),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ),

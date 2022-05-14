@@ -13,8 +13,7 @@ const kSecondaryColor = Color(0xFF979797);
 const kTextColor = Color.fromARGB(255, 240, 233, 233);
 
 const kAnimationDuration = Duration(milliseconds: 200);
-var baseUrl = "https://mis.tfs.go.tz/e-auction";
-var baseAuctionUrl = "https://mis.tfs.go.tz/e-auction";
+var baseUrl = "https://www.getvalue.co/";
 
 final headingStyle = TextStyle(
   fontSize: getProportionateScreenWidth(28),
