@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:device_info/device_info.dart';
 import 'package:getvalue/screens/login_screen/login_screen.dart';
 import 'package:getvalue/services/size_config.dart';
 
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class SplashScreen extends StatefulWidget {
   static String routeName = "/splash";
@@ -16,13 +16,30 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  final DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
-
   @override
   void initState() {
     super.initState();
 
-    Timer(const Duration(seconds: 3), () async {
+    Timer(const Duration(seconds: 5), () async {
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.camera,
+        Permission.storage,
+        Permission.photos,
+        Permission.accessMediaLocation,
+
+        Permission.manageExternalStorage
+        //add more permission to request here.
+      ].request();
+
+      // if (statuses[Permission.location]!.isDenied) {
+      //   //check each permission status after.
+      //   print("Location permission is denied.");
+      // }
+
+      // if (statuses[Permission.camera]!.isDenied) {
+      //   //check each permission status after.
+      //   print("Camera permission is denied.");
+      // }
       Navigator.push(context,
           MaterialPageRoute(builder: (context) => const LoginScreen()));
     });

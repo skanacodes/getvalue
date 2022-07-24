@@ -1,7 +1,10 @@
 // ignore_for_file: unused_element, avoid_print
 
 import 'dart:convert';
+
 import 'package:getvalue/screens/Dashboard/dashboard_screen.dart';
+import 'package:getvalue/screens/my_product/my_product_screen.dart';
+import 'package:getvalue/services/form_error.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
@@ -9,6 +12,7 @@ import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:getvalue/screens/register/register.dart';
 import 'package:getvalue/services/constants.dart';
 import 'package:getvalue/size_confige.dart';
+import 'package:rflutter_alert/rflutter_alert.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 
@@ -28,40 +32,31 @@ class _LoginScreenState extends State<LoginScreen> {
   String? password;
   String auth = '';
   String? role;
-
   final List<String> errors = [];
 
-  Future<void> createUser(
-      String token,
-      int userId,
-      int stationId,
-      String checkpointId,
-      String fname,
-      String lname,
-      String email,
-      String phoneNumber,
-      String stationName,
-      String checkpointName) async {
+  Future<void> createUser(String fname, String lname, String gender,
+      String phoneNumber, String email, String avatar) async {
     await SharedPreferences.getInstance().then((prefs) {
-      prefs.setInt('user_id', userId);
-      prefs.setString('token', token);
-      prefs.setInt('station_id', stationId);
-      prefs.setString('StationName', stationName);
+      ;
       prefs.setString('fname', fname);
       prefs.setString('lname', lname);
       prefs.setString('email', email);
       prefs.setString('phoneNumber', phoneNumber);
-      prefs.setString('checkpointId', checkpointId);
-      prefs.setString('checkpointName', checkpointName);
+      prefs.setString('gender', gender);
+      prefs.setString('avatar', avatar);
     });
   }
 
   Future<String> loginAuth() async {
     try {
-      var url = Uri.parse('$baseUrl/app/api/authenticate');
+      var url = Uri.parse('$baseUrl/api/authenticate');
 
       final response = await http.post(
         url,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "accept": "application/x-www-form-urlencoded",
+        },
         body: {
           'username': username,
           'password': password,
@@ -76,49 +71,21 @@ class _LoginScreenState extends State<LoginScreen> {
             res = json.decode(response.body);
             print(res);
           });
-
-          await createUser(
-            res['access_token'],
-            res['user']['user_id'],
-            res['user']['station_id'],
-            res['user']['checkpoint_id'].toString(),
-            res['user']['first_name'],
-            res['user']['last_name'],
-            res['user']['email'].toString(),
-            res['user']['phone'].toString(),
-            res['user']['station'].toString(),
-            res['user']['checkpoint_name'].toString(),
-          );
-          return 'success';
-          // ignore: dead_code
-          break;
-        case 403:
-          setState(() {
-            res = json.decode(response.body);
-            print(res);
-            if (res['message'] == 'Invalid Credentials') {
-              addError(error: 'Incorrect Password or Email');
-            } else if (res['message'] ==
-                'Your Device Is Locked Please Contact User Support Team') {
-              addError(
-                  error:
-                      'Your Device Is Locked Please Contact User Support Team');
-            }
-
-            isLoading = false;
-          });
-          return 'fail';
-          // ignore: dead_code
-          break;
-
-        case 1200:
-          setState(() {
-            res = json.decode(response.body);
-            print(res);
-            addError(
-                error:
-                    'Your Device Is Locked Please Contact User Support Team');
-          });
+          if (res["message"].toString() == "Logged Successfully") {
+            await createUser(
+              res['details']['first_name'].toString(),
+              res['details']['surname'].toString(),
+              res['details']['gender'].toString(),
+              res['details']['phone'].toString(),
+              res['details']['email'].toString(),
+              res['details']['avatar'].toString(),
+            );
+            return 'success';
+          }
+          if (res["message"].toString() == "Incorrect username or password") {
+            addError(error: "Incorrect username or password");
+            return 'fail';
+          }
           return 'fail';
           // ignore: dead_code
           break;
@@ -161,50 +128,77 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  loading() {
+    return Alert(
+        context: context,
+        desc: "Authenticating...",
+        style: AlertStyle(
+            descStyle: TextStyle(
+              fontSize: 13.sp,
+              fontFamily: "Ubuntu",
+            ),
+            isButtonVisible: false,
+            isCloseButton: false),
+        onWillPopActive: true,
+        content: Column(
+          children: [
+            SpinKitThreeBounce(
+              color: Colors.blue,
+              size: 20.sp,
+            )
+          ],
+        )).show();
+  }
+
   Widget _submitButton() {
     return InkWell(
       onTap: () async {
         if (_formKey.currentState!.validate()) {
           _formKey.currentState!.save();
-          // print(username);
-          // print(password);
+          setState(() {
+            isLoading = true;
+          });
+          loading();
+          String res = await loginAuth();
+          Navigator.pop(context);
+          //await Future.delayed(const Duration(seconds: 1));
+          if (res == "success") {
+            _formKey.currentState!.reset();
+            Navigator.of(context).pushNamed(MyProductScreen.routeName);
+          }
 
-          // await loginAuth();
-          Navigator.of(context).pushNamed(DashBoardScreen.routeName);
+          setState(() {
+            isLoading = false;
+          });
         }
       },
-      child: isLoading
-          ? SpinKitFadingCircle(
-              color: kPrimaryColor,
-              size: 35.0.sp,
-            )
-          : Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Container(
-                height: 50,
-                width: MediaQuery.of(context).size.width,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: kPrimaryColor,
-                  borderRadius: const BorderRadius.all(Radius.circular(5)),
-                  boxShadow: <BoxShadow>[
-                    BoxShadow(
-                        color: Colors.grey.shade200,
-                        offset: const Offset(2, 14),
-                        blurRadius: 5,
-                        spreadRadius: 2)
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(0.0),
-                  child: Text(
-                    'LOGIN',
-                    style: TextStyle(fontSize: 13.0.sp, color: Colors.white),
-                  ),
-                ),
-              ),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Container(
+          height: 50,
+          width: MediaQuery.of(context).size.width,
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: kPrimaryColor,
+            borderRadius: const BorderRadius.all(Radius.circular(5)),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                  color: Colors.grey.shade200,
+                  offset: const Offset(2, 14),
+                  blurRadius: 5,
+                  spreadRadius: 2)
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(0.0),
+            child: Text(
+              'LOGIN',
+              style: TextStyle(fontSize: 13.0.sp, color: Colors.white),
             ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -309,10 +303,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                           error:
                                               'Server Or Network Connectivity Error')
                                       : errors.contains(
-                                              'Incorrect Password or Email')
+                                              'Incorrect username or password')
                                           ? removeError(
                                               error:
-                                                  'Incorrect Password or Email')
+                                                  'Incorrect username or password')
                                           : removeError(
                                               error:
                                                   'Your Not Authourized To Use This App');
@@ -366,10 +360,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                           error:
                                               'Server Or Network Connectivity Error')
                                       : errors.contains(
-                                              'Incorrect Password or Email')
+                                              'Incorrect username or password')
                                           ? removeError(
                                               error:
-                                                  'Incorrect Password or Email')
+                                                  'Incorrect username or password')
                                           : removeError(
                                               error:
                                                   'Your Not Authourized To Use This App');
@@ -379,6 +373,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
+                        FormError(errors: errors),
                         Padding(
                           padding: const EdgeInsets.only(
                               top: 10, right: 17, left: 20),

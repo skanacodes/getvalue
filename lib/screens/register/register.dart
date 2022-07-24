@@ -1,10 +1,14 @@
 // ignore_for_file: unused_element, body_might_complete_normally_nullable
 
 import 'dart:convert';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:getvalue/screens/Dashboard/dashboard_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:getvalue/screens/login_screen/login_screen.dart';
+import 'package:rflutter_alert/rflutter_alert.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:getvalue/services/constants.dart';
@@ -47,16 +51,56 @@ class _RegisterState extends State<Register> {
     }
   }
 
+  Future<void> createUser(String fname, String lname, String gender,
+      String phoneNumber, String email, String avatar) async {
+    await SharedPreferences.getInstance().then((prefs) {
+      ;
+      prefs.setString('fname', fname);
+      prefs.setString('lname', lname);
+      prefs.setString('email', email);
+      prefs.setString('phoneNumber', phoneNumber);
+      prefs.setString('gender', gender);
+      prefs.setString('avatar', avatar);
+    });
+  }
+
   Future<String> registerUser() async {
     try {
+      String fname = "";
+      String mname = "";
+      String lname = "";
       var url = Uri.parse('$baseUrl/app/user/register_customer');
+      final names = name!.split(" ");
+      if (names.length == 1) {
+        setState(() {
+          fname = names[0];
+        });
+      }
+      if (names.length == 2) {
+        setState(() {
+          fname = names[0];
+          lname = names[1];
+        });
+      }
+      if (names.length == 3) {
+        setState(() {
+          fname = names[0];
+          mname = names[1];
+          lname = names[2];
+        });
+      }
 
       final response = await http.post(
         url,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "accept": "application/x-www-form-urlencoded",
+        },
         body: {
-          'surname': "sikana",
+          'auth': authkey,
+          'surname': lname,
           'password': password,
-          'first_name': name,
+          'first_name': fname,
           'email': username,
           'phone': phoneNumber
         },
@@ -70,8 +114,30 @@ class _RegisterState extends State<Register> {
             res = json.decode(response.body);
             print(res);
           });
-
-          return 'success';
+          if (res["feedback"].toString() == "Registered Successfully") {
+            await createUser(
+              res['details']['first_name'].toString(),
+              res['details']['surname'].toString(),
+              res['details']['gender'].toString(),
+              res['details']['phone'].toString(),
+              res['details']['email'].toString(),
+              res['details']['avatar'].toString(),
+            );
+            return 'success';
+          }
+          if (res["feedback"].toString() == "Account already exist") {
+            // addError(error: "Incorrect username or password");
+            Fluttertoast.showToast(
+                msg: "Account Already Exist",
+                toastLength: Toast.LENGTH_SHORT,
+                gravity: ToastGravity.BOTTOM,
+                timeInSecForIosWeb: 1,
+                backgroundColor: Colors.grey,
+                textColor: Colors.white,
+                fontSize: 16.0);
+            return 'fail';
+          }
+          return 'fail';
           // ignore: dead_code
           break;
         case 403:
@@ -127,44 +193,64 @@ class _RegisterState extends State<Register> {
     }
   }
 
+  loading() {
+    return Alert(
+        context: context,
+        desc: "Creating...",
+        style: AlertStyle(
+            descStyle: TextStyle(
+              fontSize: 13.sp,
+              fontFamily: "Ubuntu",
+            ),
+            isButtonVisible: false,
+            isCloseButton: false),
+        onWillPopActive: true,
+        content: Column(
+          children: [
+            SpinKitThreeBounce(
+              color: Colors.blue,
+              size: 20.sp,
+            )
+          ],
+        )).show();
+  }
+
   Widget _submitButton() {
     return InkWell(
       onTap: () async {
         if (_formKey.currentState!.validate()) {
           _formKey.currentState!.save();
-          print(username);
-          print(password);
-          print(name);
-          print(phoneNumber);
 
-          await registerUser();
+          loading();
+          String res = await registerUser();
+          Navigator.pop(context);
+          //await Future.delayed(const Duration(seconds: 1));
+          if (res == "success") {
+            _formKey.currentState!.reset();
+            Navigator.of(context).pushNamed(DashBoardScreen.routeName);
+          }
         }
       },
-      child: isLoading
-          ? SpinKitFadingCircle(
-              color: kPrimaryColor,
-              size: 35.0.sp,
-            )
-          : Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Container(
-                height: 50,
-                width: MediaQuery.of(context).size.width,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: kPrimaryColor,
-                  borderRadius: BorderRadius.all(Radius.circular(5)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(0.0),
-                  child: Text(
-                    'REGISTER',
-                    style: TextStyle(fontSize: 13.0.sp, color: Colors.white),
-                  ),
-                ),
-              ),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Container(
+          height: 50,
+          width: MediaQuery.of(context).size.width,
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: kPrimaryColor,
+            borderRadius: BorderRadius.all(Radius.circular(5)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(0.0),
+            child: Text(
+              'REGISTER',
+              style: TextStyle(fontSize: 13.0.sp, color: Colors.white),
             ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -297,6 +383,11 @@ class _RegisterState extends State<Register> {
                                 validator: (value) {
                                   if (value!.isEmpty) {
                                     return "This Field Is Required";
+                                  } else {
+                                    final names = value.split(" ");
+                                    if (names.length <= 1) {
+                                      return "Please Fill First Name And Surname";
+                                    }
                                   }
                                 },
                                 onSaved: (value) {

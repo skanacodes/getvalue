@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
 import 'package:getvalue/screens/splash_Screen/splash_screen.dart';
 import 'package:getvalue/size_confige.dart';
 
@@ -89,8 +90,10 @@ class _MyAppState extends State<MyApp> {
           debugShowCheckedModeBanner: false,
           title: 'GetValue',
           theme: theme(),
+
           home: Builder(builder: (context) {
             SizeConfig.initSize(context);
+
             return const SplashScreen();
           }),
           // We use routeName so that we dont need to remember the name

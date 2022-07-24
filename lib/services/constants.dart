@@ -13,7 +13,7 @@ const kSecondaryColor = Color(0xFF979797);
 const kTextColor = Color.fromARGB(255, 240, 233, 233);
 
 const kAnimationDuration = Duration(milliseconds: 200);
-var baseUrl = "https://www.getvalue.co/";
+const baseUrl = "https://www.getvalue.co";
 
 final headingStyle = TextStyle(
   fontSize: getProportionateScreenWidth(28),
@@ -35,6 +35,7 @@ const String kMatchPassError = "Passwords don't match";
 const String kNamelNullError = "Please Enter your name";
 const String kPhoneNumberNullError = "Please Enter your phone number";
 const String kAddressNullError = "Please Enter your address";
+const String authkey = "b81bd363b70fb1a6e921150a4df6413d";
 
 final otpInputDecoration = InputDecoration(
   contentPadding:
